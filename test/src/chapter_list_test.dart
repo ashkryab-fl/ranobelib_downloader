@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ranobeli_downloader/src/chapter_list.dart';
-import 'package:ranobeli_downloader/src/controller.dart';
-import 'package:ranobeli_downloader/src/models.dart';
-import 'package:ranobeli_downloader/src/translation_choices.dart';
+import 'package:ranobeli_downloader/src/presentation/widgets/chapter_list.dart';
+import 'package:ranobeli_downloader/src/presentation/cubit/download_cubit.dart';
+import 'package:ranobeli_downloader/src/presentation/cubit/download_state.dart';
+import 'package:ranobeli_downloader/src/domain/models.dart';
+import 'package:ranobeli_downloader/src/presentation/widgets/translation_choices.dart';
 
 Novel translationFixture() => Novel(
   'translations',
@@ -39,65 +41,71 @@ Novel translationFixture() => Novel(
 );
 
 void main() {
-  late DownloadController controller;
+  late DownloadCubit controller;
 
   setUp(() {
-    controller = DownloadController()..novel = translationFixture();
-    controller.setBranch(null);
+    controller = DownloadCubit()..setNovelForTesting(translationFixture());
   });
-  tearDown(() => controller.dispose());
+  tearDown(() => controller.close());
 
   test('shares a volume selector only for identical available branch sets', () {
-    expect(controller.chapters, hasLength(5));
-    expect(controller.volumeBranchChoices['1'], ['1', '2', '3']);
-    expect(controller.volumeBranchChoices.containsKey('2'), isFalse);
-    expect(controller.volumeBranchChoices['3'], ['9']);
+    expect(controller.state.chapters, hasLength(5));
+    expect(controller.state.volumeBranchChoices['1'], ['1', '2', '3']);
+    expect(controller.state.volumeBranchChoices.containsKey('2'), isFalse);
+    expect(controller.state.volumeBranchChoices['3'], ['9']);
   });
 
   test('chapter changes retain checks and the matching variant metadata', () {
     controller.selectAll(false, volume: '1');
-    final selected = {...controller.selected};
-    final otherChapters = controller.chapters.skip(1).toList();
+    final selected = {...controller.state.selected};
+    final otherChapters = controller.state.chapters.skip(1).toList();
     controller.setChapterBranch('1/1', '3');
 
-    expect(controller.chapters.first.branch.id, '3');
-    expect(controller.chapters.first.chapter.name, 'Інша назва');
-    expect(controller.chapters.skip(1), otherChapters);
-    expect(controller.selected, selected);
-    expect(controller.selectedVolumeBranch('1'), isNull);
+    expect(controller.state.chapters.first.branch.id, '3');
+    expect(controller.state.chapters.first.chapter.name, 'Інша назва');
+    expect(controller.state.chapters.skip(1), otherChapters);
+    expect(controller.state.selected, selected);
+    expect(controller.state.selectedVolumeBranch('1'), isNull);
     expect(
-      controller.chapterRows.whereType<ChapterSelection>().first.branch.id,
+      controller.state.chapterRows
+          .whereType<ChapterSelection>()
+          .first
+          .branch
+          .id,
       '3',
     );
 
     controller.setChapterBranch('1/1', 'missing');
-    expect(controller.chapters.first.branch.id, '3');
+    expect(controller.state.chapters.first.branch.id, '3');
   });
 
   test(
     'volume changes include unchecked chapters and leave other volumes alone',
     () {
-      controller.toggle(controller.chapters.first.chapter, false);
-      final selected = {...controller.selected};
-      final otherVolumes = controller.chapters.skip(2).toList();
+      controller.toggle(controller.state.chapters.first.chapter, false);
+      final selected = {...controller.state.selected};
+      final otherVolumes = controller.state.chapters.skip(2).toList();
       controller.setVolumeBranch('1', '3');
 
-      expect(controller.chapters.take(2).map((s) => s.branch.id), ['3', '3']);
-      expect(controller.selectedVolumeBranch('1'), '3');
-      expect(controller.chapters.skip(2), otherVolumes);
-      expect(controller.selected, selected);
+      expect(controller.state.chapters.take(2).map((s) => s.branch.id), [
+        '3',
+        '3',
+      ]);
+      expect(controller.state.selectedVolumeBranch('1'), '3');
+      expect(controller.state.chapters.skip(2), otherVolumes);
+      expect(controller.state.selected, selected);
 
       controller.setVolumeBranch('2', '1');
-      expect(controller.chapters.skip(2), otherVolumes);
+      expect(controller.state.chapters.skip(2), otherVolumes);
     },
   );
 
   test('local selectors cannot change a download in progress', () async {
-    final before = controller.chapters;
+    final before = controller.state.chapters;
     await controller.run(() async {
       controller.setChapterBranch('2/1', '2');
       controller.setVolumeBranch('1', '3');
-      expect(controller.chapters, same(before));
+      expect(controller.state.chapters, equals(before));
     });
   });
 
@@ -106,17 +114,17 @@ void main() {
     () {
       controller.setVolumeBranch('1', '3');
       controller.setBranch('2');
-      expect(controller.chapters.map((s) => s.branch.id), [
+      expect(controller.state.chapters.map((s) => s.branch.id), [
         '2',
         '2',
         '2',
         '2',
         '9',
       ]);
-      expect(controller.volumeKeys.keys, ['1', '2', '3']);
+      expect(controller.state.volumeKeys.keys, ['1', '2', '3']);
       controller.setBranch(null);
-      expect(controller.chapters, hasLength(5));
-      expect(controller.selectedVolumeBranch('1'), '1');
+      expect(controller.state.chapters, hasLength(5));
+      expect(controller.state.selectedVolumeBranch('1'), '1');
     },
   );
 
@@ -124,26 +132,26 @@ void main() {
     'global selection preserves current alternatives, checks and collapsed volumes',
     () {
       controller.setChapterBranch('2/2', '3');
-      controller.toggle(controller.chapters.first.chapter, false);
+      controller.toggle(controller.state.chapters.first.chapter, false);
       controller.toggleVolumeExpanded('1');
-      final keys = controller.chapters.map((s) => s.chapter.key).toList();
-      final selected = {...controller.selected};
+      final keys = controller.state.chapters.map((s) => s.chapter.key).toList();
+      final selected = {...controller.state.selected};
 
       controller.setBranch('1');
 
-      expect(controller.chapters.map((s) => s.chapter.key), keys);
-      expect(controller.chapters.map((s) => s.branch.id), [
+      expect(controller.state.chapters.map((s) => s.chapter.key), keys);
+      expect(controller.state.chapters.map((s) => s.branch.id), [
         '1',
         '1',
         '1',
         '3',
         '9',
       ]);
-      expect(controller.selected, selected);
-      expect(controller.collapsedVolumes, {'1'});
+      expect(controller.state.selected, selected);
+      expect(controller.state.collapsedVolumes, {'1'});
 
       controller.setBranch('9');
-      expect(controller.chapters.map((s) => s.branch.id), [
+      expect(controller.state.chapters.map((s) => s.branch.id), [
         '1',
         '1',
         '1',
@@ -151,23 +159,23 @@ void main() {
         '9',
       ]);
       controller.setBranch('2');
-      expect(controller.chapters.map((s) => s.branch.id), [
+      expect(controller.state.chapters.map((s) => s.branch.id), [
         '2',
         '2',
         '2',
         '2',
         '9',
       ]);
-      expect(controller.selected, selected);
+      expect(controller.state.selected, selected);
 
       controller.setBranch(null);
-      expect(controller.chapters.map((s) => s.chapter.key), keys);
-      expect(controller.selected, selected);
-      expect(controller.collapsedVolumes, {'1'});
+      expect(controller.state.chapters.map((s) => s.chapter.key), keys);
+      expect(controller.state.selected, selected);
+      expect(controller.state.collapsedVolumes, {'1'});
 
       controller.selectAll(false);
       controller.setBranch('1');
-      expect(controller.selected, isEmpty);
+      expect(controller.state.selected, isEmpty);
     },
   );
 
@@ -179,10 +187,12 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: ListenableBuilder(
-            listenable: controller,
+          body: BlocBuilder<DownloadCubit, DownloadState>(
+            bloc: controller,
             builder: (_, _) => CustomScrollView(
-              slivers: [ChapterList(controller: controller)],
+              slivers: [
+                ChapterList(controller: controller, state: controller.state),
+              ],
             ),
           ),
         ),
@@ -225,12 +235,12 @@ void main() {
       expect(find.byType(DropdownButton<String>), findsNothing);
       expect(tester.takeException(), isNull);
 
-      controller.toggle(controller.chapters.first.chapter, false);
+      controller.toggle(controller.state.chapters.first.chapter, false);
       await tester.pump();
       await tester.tap(choice('volume-translation:1', '3'));
       await tester.pump();
-      expect(controller.selectedVolumeBranch('1'), '3');
-      expect(controller.selected.contains('1/1'), isFalse);
+      expect(controller.state.selectedVolumeBranch('1'), '3');
+      expect(controller.state.selected.contains('1/1'), isFalse);
       expectChoice('volume-translation:1', '3');
 
       await tester.tap(choice('volume-translation:1', '3'));
@@ -240,7 +250,10 @@ void main() {
       await tester.tap(choice('chapter-translation:2/1', '2'));
       await tester.pump();
       expect(
-        controller.chapters.firstWhere((s) => s.chapter.key == '2/1').branch.id,
+        controller.state.chapters
+            .firstWhere((s) => s.chapter.key == '2/1')
+            .branch
+            .id,
         '2',
       );
       expectChoice('chapter-translation:2/1', '2');
@@ -277,14 +290,14 @@ void main() {
     tester,
   ) async {
     await showChapters(tester);
-    controller.toggle(controller.chapters.first.chapter, false);
+    controller.toggle(controller.state.chapters.first.chapter, false);
     controller.setVolumeBranch('1', '3');
-    final selected = {...controller.selected};
+    final selected = {...controller.state.selected};
     await tester.pump();
 
     await tester.tap(find.byKey(const ValueKey('volume-expansion:1')));
     await tester.pump();
-    expect(controller.collapsedVolumes, contains('1'));
+    expect(controller.state.collapsedVolumes, contains('1'));
     expect(group('volume-header:1'), findsOneWidget);
     expect(group('volume-translation:1'), findsNothing);
     expect(find.text('Глава 1 — Інша назва'), findsNothing);
@@ -293,15 +306,15 @@ void main() {
       findsOneWidget,
     ); // The other volume stays open.
     expect(group('chapter-translation:2/1'), findsOneWidget);
-    expect(controller.selected, selected);
-    expect(controller.selectedVolumeBranch('1'), '3');
+    expect(controller.state.selected, selected);
+    expect(controller.state.selectedVolumeBranch('1'), '3');
 
     await tester.tap(find.text('Том 1'));
     await tester.pump();
-    expect(controller.collapsedVolumes, isNot(contains('1')));
+    expect(controller.state.collapsedVolumes, isNot(contains('1')));
     expect(find.text('Глава 1 — Інша назва'), findsOneWidget);
     expectChoice('volume-translation:1', '3');
-    expect(controller.selected, selected);
+    expect(controller.state.selected, selected);
   });
 
   testWidgets('selects collapsed volumes without expanding them', (
@@ -315,15 +328,15 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('volume-selection:2')));
     await tester.pump();
-    expect(controller.selected, isNot(contains('2/1')));
-    expect(controller.selected, isNot(contains('2/2')));
-    expect(controller.collapsedVolumes, contains('2'));
-    expect(controller.selected, contains('1/1'));
+    expect(controller.state.selected, isNot(contains('2/1')));
+    expect(controller.state.selected, isNot(contains('2/2')));
+    expect(controller.state.collapsedVolumes, contains('2'));
+    expect(controller.state.selected, contains('1/1'));
 
     await tester.tap(find.byKey(const ValueKey('volume-selection:2')));
     await tester.pump();
-    expect(controller.selected, containsAll(['2/1', '2/2']));
-    expect(controller.collapsedVolumes, contains('2'));
+    expect(controller.state.selected, containsAll(['2/1', '2/2']));
+    expect(controller.state.collapsedVolumes, contains('2'));
     expect(tester.takeException(), isNull);
   });
 }

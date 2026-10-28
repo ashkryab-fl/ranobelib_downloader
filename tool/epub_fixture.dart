@@ -1,9 +1,9 @@
 import 'dart:io';
 
 import 'package:image/image.dart' as image;
-import 'package:ranobeli_downloader/src/content.dart';
-import 'package:ranobeli_downloader/src/epub.dart';
-import 'package:ranobeli_downloader/src/models.dart';
+import 'package:ranobeli_downloader/src/data/content.dart';
+import 'package:ranobeli_downloader/src/data/epub.dart';
+import 'package:ranobeli_downloader/src/domain/models.dart';
 
 /// Generates a synthetic book for independent EPUBCheck validation. No network.
 Future<void> main(List<String> arguments) async {

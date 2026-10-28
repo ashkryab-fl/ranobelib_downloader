@@ -4,12 +4,12 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
-import 'models.dart';
+import '../domain/models.dart';
 
 class DownloadCancelled implements Exception {
   const DownloadCancelled();
   @override
-  String toString() => 'Завантаження скасовано.';
+  String toString() => 'Загрузка отменена.';
 }
 
 class Cancellation {
@@ -94,9 +94,7 @@ class RanobeApi {
   Future<http.Response> _get(Uri uri, Cancellation cancel) async {
     for (var redirects = 0; redirects < 6; redirects++) {
       if (uri.scheme != 'https' || uri.userInfo.isNotEmpty) {
-        throw const ApiException(
-          'Сайт повернув небезпечне посилання на ресурс.',
-        );
+        throw const ApiException('Сайт вернул небезопасную ссылку на ресурс.');
       }
       cancel.check();
       final request = http.Request('GET', uri)
@@ -113,7 +111,7 @@ class RanobeApi {
       if ([301, 302, 303, 307, 308].contains(response.statusCode)) {
         final location = response.headers['location'];
         if (location == null) {
-          throw const ApiException('Перенаправлення без адреси.');
+          throw const ApiException('Перенаправление без адреса.');
         }
         // Rebuild headers for every host so bearer credentials cannot leak to a CDN.
         uri = uri.resolve(location);
@@ -121,7 +119,7 @@ class RanobeApi {
       }
       return response;
     }
-    throw const ApiException('Забагато перенаправлень.');
+    throw const ApiException('Слишком много перенаправлений.');
   }
 
   Future<http.Response> _request(
@@ -145,7 +143,7 @@ class RanobeApi {
               refreshToken != null && await cancel.bind(refreshToken!());
           if (!refreshed && login && authorize != null) {
             if (!await cancel.bind(authorize!())) {
-              throw const ApiException('Для цієї книги потрібна авторизація.');
+              throw const ApiException('Для этой книги нужна авторизация.');
             }
           }
           cancel.check();
@@ -155,7 +153,7 @@ class RanobeApi {
         if (response.statusCode == 429 || response.statusCode >= 500) {
           if (attempt >= delays.length) {
             throw ApiException(
-              'Сервер тимчасово недоступний (HTTP ${response.statusCode}).',
+              'Сервер временно недоступен (HTTP ${response.statusCode}).',
               response.statusCode,
             );
           }
@@ -167,23 +165,23 @@ class RanobeApi {
         }
         if (response.statusCode < 200 || response.statusCode >= 300) {
           throw ApiException(switch (response.statusCode) {
-            401 => 'Сесія закінчилася. Увійдіть у свій акаунт.',
-            403 => 'Акаунт не має доступу до цього вмісту.',
-            404 => 'Книгу, главу або зображення не знайдено.',
-            _ => 'Помилка сайту (HTTP ${response.statusCode}).',
+            401 => 'Сессия истекла. Войдите в свой аккаунт.',
+            403 => 'У аккаунта нет доступа к этому содержимому.',
+            404 => 'Книга, глава или изображение не найдены.',
+            _ => 'Ошибка сайта (HTTP ${response.statusCode}).',
           }, response.statusCode);
         }
         return response;
       } on TimeoutException {
         if (attempt >= delays.length) {
           throw const ApiException(
-            'Сервер не відповідає. Перевірте інтернет і повторіть спробу.',
+            'Сервер не отвечает. Проверьте интернет и повторите попытку.',
           );
         }
       } on http.ClientException {
         if (attempt >= delays.length) {
           throw const ApiException(
-            'Не вдалося з’єднатися із сайтом. Перевірте інтернет.',
+            'Не удалось соединиться с сайтом. Проверьте интернет.',
           );
         }
       }
@@ -202,9 +200,7 @@ class RanobeApi {
       if (decoded is! Map) throw const FormatException();
       return asMap(decoded);
     } on FormatException {
-      throw const ApiException(
-        'Сайт повернув некоректну відповідь замість JSON.',
-      );
+      throw const ApiException('Сайт вернул некорректный ответ вместо JSON.');
     }
   }
 
@@ -226,13 +222,13 @@ class RanobeApi {
       cancel,
     );
     final data = asMap(info['data']);
-    if (data.isEmpty) throw const ApiException('Сайт не повернув дані книги.');
+    if (data.isEmpty) throw const ApiException('Сайт не вернул данные книги.');
     final response = await getJson(
       Uri.https(apiHost, '/api/manga/$slug/chapters'),
       cancel,
     );
     if (response['data'] is! List) {
-      throw const ApiException('Сайт не повернув список глав.');
+      throw const ApiException('Сайт не вернул список глав.');
     }
     return Novel(slug, data, Chapter.fromResponse(response['data']));
   }
@@ -253,7 +249,7 @@ class RanobeApi {
     final chapter = asMap(data['data']);
     if (chapter['content'] == null || chapter['content'] == '') {
       throw ApiException(
-        'Глава ${selection.chapter.number} недоступна або порожня.',
+        'Глава ${selection.chapter.number} недоступна или пуста.',
       );
     }
     return chapter;
@@ -272,7 +268,7 @@ class RanobeApi {
     );
     final user = asMap(result['data']);
     if (user['id'] == null) {
-      throw const ApiException('Не вдалося перевірити акаунт.');
+      throw const ApiException('Не удалось проверить аккаунт.');
     }
     return user;
   }
@@ -288,14 +284,14 @@ class RanobeApi {
         .timeout(const Duration(seconds: 20));
     if (response.statusCode != 200) {
       throw ApiException(
-        'Не вдалося завершити авторизацію (HTTP ${response.statusCode}).',
+        'Не удалось завершить авторизацию (HTTP ${response.statusCode}).',
         response.statusCode,
       );
     }
     final data = asMap(jsonDecode(response.body));
     if (data['access_token'] is! String ||
         textOf(data['access_token']).isEmpty) {
-      throw const ApiException('Сервер не повернув токен авторизації.');
+      throw const ApiException('Сервер не вернул токен авторизации.');
     }
     return data;
   }

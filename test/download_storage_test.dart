@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ranobeli_downloader/src/download_storage.dart';
+import 'package:ranobeli_downloader/src/data/download_storage.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

@@ -5,7 +5,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'api.dart';
-import 'models.dart';
+import '../domain/models.dart';
 
 abstract interface class TokenStore {
   Future<String?> read();
@@ -62,15 +62,15 @@ class OAuthRequest {
   String codeFromCallback(Uri uri) {
     if (!isCallback(uri) || uri.queryParameters['state'] != state) {
       throw const ApiException(
-        'Не вдалося перевірити відповідь авторизації. Спробуйте увійти ще раз.',
+        'Не удалось проверить ответ авторизации. Попробуйте войти ещё раз.',
       );
     }
     if (uri.queryParameters.containsKey('error')) {
-      throw const ApiException('Авторизацію відхилено на сайті.');
+      throw const ApiException('Сайт отклонил авторизацию.');
     }
     final code = uri.queryParameters['code'];
     if (code == null || code.isEmpty) {
-      throw const ApiException('У відповіді авторизації немає коду.');
+      throw const ApiException('В ответе авторизации нет кода.');
     }
     return code;
   }
@@ -128,7 +128,7 @@ class RanobeAuth {
         .trim()
         .replaceFirst(RegExp(r'^Bearer\s+', caseSensitive: false), '')
         .trim();
-    if (token.isEmpty) throw const ApiException('Вставте токен.');
+    if (token.isEmpty) throw const ApiException('Вставьте токен.');
     final previous = api.token;
     final refresh = api.refreshToken;
     api.token = token;

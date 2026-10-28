@@ -6,7 +6,7 @@ class TranslationChoices extends StatelessWidget {
     required this.choices,
     required this.value,
     required this.onChanged,
-    this.label = 'Переклад',
+    this.label = 'Перевод',
   });
 
   final Map<String, String> choices;

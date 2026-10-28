@@ -45,15 +45,15 @@ String extractSlug(String input) {
       !hosts.contains(uri.host.toLowerCase()) ||
       uri.userInfo.isNotEmpty ||
       (uri.hasPort && uri.port != 443)) {
-    throw const FormatException('Вставте HTTPS-посилання на книгу RanobeLIB.');
+    throw const FormatException('Вставьте HTTPS-ссылку на книгу RanobeLIB.');
   }
   final parts = uri.pathSegments;
   if (parts.length < 3 ||
       parts[0] != 'ru' ||
-      parts[1] != 'book' ||
+      (parts[1] != 'book' && parts[1] != 'manga') ||
       !RegExp(r'^[\w-]+$').hasMatch(parts[2])) {
     throw const FormatException(
-      'Посилання має вигляд https://ranobelib.me/ru/book/123--name',
+      'Ссылка должна иметь вид https://ranobelib.me/ru/book/123--name',
     );
   }
   return parts[2];
@@ -70,7 +70,7 @@ class Novel {
       decodeEntities(
             textOf(
               data['rus_name'] ?? data['eng_name'] ?? data['name'],
-              'Без назви',
+              'Без названия',
             ),
           )
           .replaceFirst(
@@ -106,7 +106,7 @@ class Novel {
     return {
       for (final entry in names.entries)
         entry.key: entry.value.isEmpty
-            ? 'Гілка ${entry.key}'
+            ? 'Ветка ${entry.key}'
             : entry.value.join(', '),
     };
   }

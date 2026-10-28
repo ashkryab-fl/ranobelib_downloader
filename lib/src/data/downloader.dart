@@ -5,13 +5,13 @@ import 'package:image/image.dart' as image;
 import 'api.dart';
 import 'content.dart';
 import 'epub.dart';
-import 'models.dart';
+import '../domain/models.dart';
 
 /// Same fixed policy as Python: fit within 800×800, JPEG quality 90.
 BookImage compressImage(Uint8List bytes) {
   var decoded = image.decodeImage(bytes);
   if (decoded == null) {
-    throw const FormatException('Не вдалося прочитати зображення.');
+    throw const FormatException('Не удалось прочитать изображение.');
   }
   if (decoded.width > 800 || decoded.height > 800) {
     final ratio =
@@ -63,7 +63,7 @@ class BookDownloader {
     String? volume,
   }) async {
     if (selected.isEmpty) {
-      throw const FormatException('Виберіть хоча б одну главу.');
+      throw const FormatException('Выберите хотя бы одну главу.');
     }
     final parser = ContentParser();
     final images = <String, BookImage>{};
@@ -76,9 +76,7 @@ class BookDownloader {
       return compressed;
     }
 
-    onProgress(
-      DownloadProgress('Завантаження обкладинки…', 0, selected.length),
-    );
+    onProgress(DownloadProgress('Загрузка обложки…', 0, selected.length));
     BookImage? cover;
     if (novel.cover.isNotEmpty) {
       final fetched = await fetch(novel.cover);
@@ -103,7 +101,7 @@ class BookDownloader {
       final raw = parser.chapterHtml(chapter);
       if (raw.trim().isEmpty) {
         throw ApiException(
-          'Не вдалося прочитати вміст глави ${selection.chapter.number}.',
+          'Не удалось прочитать содержимое главы ${selection.chapter.number}.',
         );
       }
       final xhtml = await parser.prepare(raw, (url) async {
@@ -117,7 +115,7 @@ class BookDownloader {
       prepared.add(PreparedChapter(selection.chapter, xhtml));
       onProgress(
         DownloadProgress(
-          'Завантажено ${i + 1} із ${selected.length} глав',
+          'Загружено ${i + 1} из ${selected.length} глав',
           i + 1,
           selected.length,
         ),
@@ -125,7 +123,7 @@ class BookDownloader {
     }
     cancel.check();
     onProgress(
-      DownloadProgress('Створення EPUB…', selected.length, selected.length),
+      DownloadProgress('Создание EPUB…', selected.length, selected.length),
     );
     final bytes = await cancel.bind(
       compute(

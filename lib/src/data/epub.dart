@@ -5,7 +5,7 @@ import 'package:archive/archive.dart';
 import 'package:xml/xml.dart';
 
 import 'content.dart';
-import 'models.dart';
+import '../domain/models.dart';
 
 class EpubInput {
   const EpubInput(
@@ -52,7 +52,7 @@ String safeBookFilename(String title, {String? volume}) {
 /// EPUB 3 with EPUB 2 NCX compatibility. The mimetype is first and uncompressed.
 Uint8List buildEpub(EpubInput input) {
   if (input.chapters.isEmpty) {
-    throw const FormatException('Не вибрано жодної глави.');
+    throw const FormatException('Не выбрано ни одной главы.');
   }
   final archive = Archive();
   void add(String name, List<int> bytes, {bool compress = true}) {
@@ -102,14 +102,14 @@ Uint8List buildEpub(EpubInput input) {
     addText(
       'EPUB/cover.xhtml',
       _document(
-        'Обкладинка',
-        '<div><img src="images/${xmlEscape(cover.name)}" alt="Обкладинка"/></div>',
+        'Обложка',
+        '<div><img src="images/${xmlEscape(cover.name)}" alt="Обложка"/></div>',
       ),
     );
   }
 
   final nav = StringBuffer(
-    '<nav xmlns:epub="http://www.idpf.org/2007/ops" epub:type="toc" id="toc"><h1>Зміст</h1><ol>',
+    '<nav xmlns:epub="http://www.idpf.org/2007/ops" epub:type="toc" id="toc"><h1>Содержание</h1><ol>',
   );
   for (final volume in volumes.entries) {
     nav.write(
@@ -123,7 +123,7 @@ Uint8List buildEpub(EpubInput input) {
     nav.write('</ol></li>');
   }
   nav.write('</ol></nav>');
-  addText('EPUB/nav.xhtml', _document('Зміст', nav.toString()));
+  addText('EPUB/nav.xhtml', _document('Содержание', nav.toString()));
 
   final ncx = XmlBuilder();
   ncx.processing('xml', 'version="1.0" encoding="UTF-8"');
@@ -311,7 +311,7 @@ Uint8List buildEpub(EpubInput input) {
               'reference',
               attributes: {
                 'type': 'cover',
-                'title': 'Обкладинка',
+                'title': 'Обложка',
                 'href': 'cover.xhtml',
               },
             );

@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
 
-import 'controller.dart';
-import 'models.dart';
+import '../cubit/download_cubit.dart';
+import '../cubit/download_state.dart';
+import '../../domain/models.dart';
 import 'translation_choices.dart';
 
 class ChapterList extends StatelessWidget {
-  const ChapterList({super.key, required this.controller});
+  const ChapterList({super.key, required this.controller, required this.state});
 
-  final DownloadController controller;
+  final DownloadCubit controller;
+  final DownloadState state;
 
   @override
   Widget build(BuildContext context) {
-    final c = controller;
+    final c = state;
     final names = c.novel?.branchNames ?? {};
     return SliverList.builder(
       itemCount: c.chapterRows.length,
@@ -45,16 +47,19 @@ class ChapterList extends StatelessWidget {
                       : null,
                   onChanged: c.busy
                       ? null
-                      : (_) => c.selectAll(count != keys.length, volume: row),
+                      : (_) => controller.selectAll(
+                          count != keys.length,
+                          volume: row,
+                        ),
                 ),
-                onTap: () => c.toggleVolumeExpanded(row),
+                onTap: () => controller.toggleVolumeExpanded(row),
                 trailing: IconButton(
                   key: ValueKey('volume-expansion:$row'),
                   tooltip: collapsed
-                      ? 'Розгорнути том $row'
-                      : 'Згорнути том $row',
+                      ? 'Развернуть том $row'
+                      : 'Свернуть том $row',
                   icon: Icon(collapsed ? Icons.expand_more : Icons.expand_less),
-                  onPressed: () => c.toggleVolumeExpanded(row),
+                  onPressed: () => controller.toggleVolumeExpanded(row),
                 ),
               ),
               if (!collapsed && branches != null)
@@ -62,14 +67,14 @@ class ChapterList extends StatelessWidget {
                   padding: const EdgeInsets.fromLTRB(40, 0, 20, 12),
                   child: TranslationChoices(
                     key: ValueKey('volume-translation:$row'),
-                    label: 'Переклад тому',
+                    label: 'Перевод тома',
                     choices: {
-                      for (final id in branches) id: names[id] ?? 'Гілка $id',
+                      for (final id in branches) id: names[id] ?? 'Ветка $id',
                     },
                     value: c.selectedVolumeBranch(row),
                     onChanged: c.busy
                         ? null
-                        : (value) => c.setVolumeBranch(row, value),
+                        : (value) => controller.setVolumeBranch(row, value),
                   ),
                 ),
             ],
@@ -88,22 +93,22 @@ class ChapterList extends StatelessWidget {
               contentPadding: const EdgeInsets.fromLTRB(32, 0, 20, 0),
               onChanged: c.busy
                   ? null
-                  : (value) => c.toggle(ch, value ?? false),
+                  : (value) => controller.toggle(ch, value ?? false),
             ),
             if (!c.volumeBranchChoices.containsKey(ch.volume))
               Padding(
                 padding: const EdgeInsets.fromLTRB(56, 0, 20, 12),
                 child: TranslationChoices(
                   key: ValueKey('chapter-translation:${ch.key}'),
-                  label: 'Переклад глави',
+                  label: 'Перевод главы',
                   choices: {
                     for (final id in c.novel!.chapterChoices[ch.key]!.keys)
-                      id: names[id] ?? 'Гілка $id',
+                      id: names[id] ?? 'Ветка $id',
                   },
                   value: selection.branch.id,
                   onChanged: c.busy
                       ? null
-                      : (value) => c.setChapterBranch(ch.key, value),
+                      : (value) => controller.setChapterBranch(ch.key, value),
                 ),
               ),
             const Padding(

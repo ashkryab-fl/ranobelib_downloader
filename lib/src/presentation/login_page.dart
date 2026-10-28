@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
-import 'auth.dart';
+import '../data/auth.dart';
 
 class LoginResult {
   const LoginResult({this.callback, this.token});
@@ -48,7 +48,7 @@ class _LoginPageState extends State<LoginPage> {
             if (error.isForMainFrame == true && mounted && !_finished) {
               setState(
                 () => _error =
-                    'Не вдалося відкрити сторінку входу. Перевірте інтернет або вставте токен.',
+                    'Не удалось открыть страницу входа. Проверьте интернет или вставьте токен.',
               );
             }
           },
@@ -73,13 +73,13 @@ class _LoginPageState extends State<LoginPage> {
     final token = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Вхід за токеном'),
+        title: const Text('Вход по токену'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Вставте access token свого акаунту RanobeLIB, якщо вхід через сайт не працює.',
+              'Вставьте access token своего аккаунта RanobeLIB, если вход через сайт не работает.',
             ),
             const SizedBox(height: 16),
             TextField(
@@ -97,11 +97,11 @@ class _LoginPageState extends State<LoginPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Скасувати'),
+            child: const Text('Отмена'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, input.text.trim()),
-            child: const Text('Увійти'),
+            child: const Text('Войти'),
           ),
         ],
       ),
@@ -117,7 +117,7 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Вхід у RanobeLIB')),
+    appBar: AppBar(title: const Text('Вход в RanobeLIB')),
     body: SafeArea(
       child: Column(
         children: [
@@ -133,7 +133,7 @@ class _LoginPageState extends State<LoginPage> {
                       setState(() => _error = null);
                       _web.loadRequest(widget.request.url);
                     },
-                    child: const Text('Повторити'),
+                    child: const Text('Повторить'),
                   ),
                 ],
               ),
@@ -142,7 +142,7 @@ class _LoginPageState extends State<LoginPage> {
           TextButton.icon(
             onPressed: _pasteToken,
             icon: const Icon(Icons.key),
-            label: const Text('Вставити токен'),
+            label: const Text('Вставить токен'),
           ),
         ],
       ),

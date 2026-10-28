@@ -7,13 +7,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:image/image.dart' as image;
-import 'package:ranobeli_downloader/src/api.dart';
-import 'package:ranobeli_downloader/src/auth.dart';
-import 'package:ranobeli_downloader/src/content.dart';
-import 'package:ranobeli_downloader/src/controller.dart';
-import 'package:ranobeli_downloader/src/downloader.dart';
-import 'package:ranobeli_downloader/src/epub.dart';
-import 'package:ranobeli_downloader/src/models.dart';
+import 'package:ranobeli_downloader/src/data/api.dart';
+import 'package:ranobeli_downloader/src/data/auth.dart';
+import 'package:ranobeli_downloader/src/data/content.dart';
+import 'package:ranobeli_downloader/src/presentation/cubit/download_cubit.dart';
+import 'package:ranobeli_downloader/src/data/downloader.dart';
+import 'package:ranobeli_downloader/src/data/epub.dart';
+import 'package:ranobeli_downloader/src/domain/models.dart';
 import 'package:xml/xml.dart';
 
 http.Response jsonResponse(Object value, [int status = 200]) => http.Response(
@@ -67,6 +67,10 @@ void main() {
     );
     expect(
       extractSlug('https://ranobelib.org/ru/book/123--novel'),
+      '123--novel',
+    );
+    expect(
+      extractSlug('https://ranobelib.me/ru/manga/123--novel?section=chapters'),
       '123--novel',
     );
     for (final invalid in [
@@ -558,7 +562,7 @@ void main() {
         zip.files.where((f) => f.name.startsWith('EPUB/chapter_')),
         hasLength(2),
       );
-      expect(updates.last.message, 'Створення EPUB…');
+      expect(updates.last.message, 'Создание EPUB…');
       expect(updates.last.completed, 2);
       final chapterText = utf8.decode(
         zip.findFile('EPUB/chapter_1.xhtml')!.content,
@@ -590,24 +594,24 @@ void main() {
           });
         }),
       );
-      final controller = DownloadController(
+      final controller = DownloadCubit(
         api: api,
         tokenStore: MemoryTokenStore(),
       );
-      addTearDown(controller.dispose);
+      addTearDown(controller.close);
       await controller.load('https://ranobelib.me/ru/book/123--novel');
-      expect(controller.error, isNull);
-      expect(controller.selected, {'1/1', '1/2', '2/1'});
+      expect(controller.state.error, isNull);
+      expect(controller.state.selected, {'1/1', '1/2', '2/1'});
       controller.selectAll(false, volume: '1');
-      expect(controller.selected, {'2/1'});
+      expect(controller.state.selected, {'2/1'});
       controller.selectAll(true, volume: '1');
-      expect(controller.selected.length, 3);
+      expect(controller.state.selected.length, 3);
       await controller.load('https://ranobelib.me/ru/book/123--missing');
-      expect(controller.error, isNotNull);
-      expect(controller.novel, isNull);
-      expect(controller.selected, isEmpty);
-      expect(controller.chapterRows, isEmpty);
-      expect(controller.volumeKeys, isEmpty);
+      expect(controller.state.error, isNotNull);
+      expect(controller.state.novel, isNull);
+      expect(controller.state.selected, isEmpty);
+      expect(controller.state.chapterRows, isEmpty);
+      expect(controller.state.volumeKeys, isEmpty);
     },
   );
 

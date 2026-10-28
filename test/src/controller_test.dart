@@ -6,11 +6,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:image/image.dart' as image;
-import 'package:ranobeli_downloader/src/api.dart';
-import 'package:ranobeli_downloader/src/controller.dart';
-import 'package:ranobeli_downloader/src/download_storage.dart';
-import 'package:ranobeli_downloader/src/epub.dart';
-import 'package:ranobeli_downloader/src/models.dart';
+import 'package:ranobeli_downloader/src/data/api.dart';
+import 'package:ranobeli_downloader/src/presentation/cubit/download_cubit.dart';
+import 'package:ranobeli_downloader/src/data/download_storage.dart';
+import 'package:ranobeli_downloader/src/data/epub.dart';
+import 'package:ranobeli_downloader/src/domain/models.dart';
 import 'package:xml/xml.dart';
 
 class MemoryBookStorage extends DownloadStorage {
@@ -34,7 +34,7 @@ String archiveText(Archive archive, String path) =>
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  late DownloadController controller;
+  late DownloadCubit controller;
   late MemoryBookStorage storage;
   late List<String> requests;
   late List<String?> branchRequests;
@@ -70,38 +70,40 @@ void main() {
         );
       }),
     );
-    controller = DownloadController(api: api, storage: storage);
-    controller.novel = Novel(
-      '123--novel',
-      {
-        'id': 123,
-        'rus_name': 'Назва &amp; книга',
-        'cover': {'default': 'https://cdn.example/cover.png'},
-      },
-      Chapter.fromResponse([
-        for (final (volume, number) in [
-          ('10', '1'),
-          ('1', '2'),
-          ('2', '1'),
-          ('1', '1'),
-          ('2', '3'),
-        ])
-          {
-            'volume': volume,
-            'number': number,
-            'branches': [1],
-          },
-      ]),
+    controller = DownloadCubit(api: api, storage: storage);
+    controller.setNovelForTesting(
+      Novel(
+        '123--novel',
+        {
+          'id': 123,
+          'rus_name': 'Назва &amp; книга',
+          'cover': {'default': 'https://cdn.example/cover.png'},
+        },
+        Chapter.fromResponse([
+          for (final (volume, number) in [
+            ('10', '1'),
+            ('1', '2'),
+            ('2', '1'),
+            ('1', '1'),
+            ('2', '3'),
+          ])
+            {
+              'volume': volume,
+              'number': number,
+              'branches': [1],
+            },
+        ]),
+      ),
     );
     controller.setBranch(null);
   });
-  tearDown(() => controller.dispose());
+  tearDown(() => controller.close());
 
   test('exports one book by default and opens the saved result', () async {
-    expect(controller.splitByVolume, isFalse);
+    expect(controller.state.splitByVolume, isFalse);
     await controller.download();
 
-    expect(controller.error, isNull);
+    expect(controller.state.error, isNull);
     expect(storage.files.single.name, 'Назва & книга.epub');
     final zip = ZipDecoder().decodeBytes(storage.files.single.bytes);
     expect(
@@ -114,20 +116,22 @@ void main() {
       opf.findAllElements('dc:identifier').single.innerText,
       'ranobelib-123',
     );
-    await controller.openBook(controller.savedBooks.single);
-    expect(storage.opened, controller.savedBooks.single);
+    await controller.openBook(controller.state.savedBooks.single);
+    expect(storage.opened, controller.state.savedBooks.single);
   });
 
   test('exports only selected chapters into self-contained volumes', () async {
     controller.setSplitByVolume(true);
     controller.selectAll(false, volume: '10');
     controller.toggle(
-      controller.chapters.firstWhere((s) => s.chapter.key == '1/1').chapter,
+      controller.state.chapters
+          .firstWhere((s) => s.chapter.key == '1/1')
+          .chapter,
       false,
     );
     final progress = <int>[];
-    controller.addListener(() {
-      final update = controller.progress;
+    controller.stream.listen((state) {
+      final update = state.progress;
       if (update != null) {
         expect(update.total, 3);
         progress.add(update.completed);
@@ -135,14 +139,14 @@ void main() {
     });
     await controller.download();
 
-    expect(controller.error, isNull);
+    expect(controller.state.error, isNull);
     expect(requests, ['1/2', '2/1', '2/3']);
     expect(storage.files.map((f) => f.name), [
       'Назва & книга — Том 1.epub',
       'Назва & книга — Том 2.epub',
     ]);
-    expect(controller.savedBooks, hasLength(2));
-    expect(controller.notice, 'Збережено EPUB: 2.');
+    expect(controller.state.savedBooks, hasLength(2));
+    expect(controller.state.notice, 'Сохранено EPUB: 2.');
     expect(progress, orderedEquals([...progress]..sort()));
     expect(progress.last, 3);
     for (var i = 0; i < storage.files.length; i++) {
@@ -188,10 +192,10 @@ void main() {
         expect(zip.findFile('EPUB/${item.getAttribute('href')}'), isNotNull);
       }
     }
-    await controller.openBook(controller.savedBooks.first);
-    expect(storage.opened, controller.savedBooks.first);
-    await controller.openBook(controller.savedBooks.last);
-    expect(storage.opened, controller.savedBooks.last);
+    await controller.openBook(controller.state.savedBooks.first);
+    expect(storage.opened, controller.state.savedBooks.first);
+    await controller.openBook(controller.state.savedBooks.last);
+    expect(storage.opened, controller.state.savedBooks.last);
   });
 
   test('includes the volume suffix when only one volume is selected', () async {
@@ -200,7 +204,7 @@ void main() {
     controller.selectAll(true, volume: '10');
     await controller.download();
 
-    expect(controller.error, isNull);
+    expect(controller.state.error, isNull);
     expect(storage.files.single.name, 'Назва & книга — Том 10.epub');
     expect(requests, ['10/1']);
   });
@@ -208,22 +212,26 @@ void main() {
   test(
     'exports the locally chosen translation for each selected chapter',
     () async {
-      final book = controller.novel!;
-      controller.novel = Novel(book.slug, book.data, [
-        for (final chapter in book.chapters)
-          Chapter(chapter.data, [Branch(1), Branch(2)]),
-      ]);
+      final book = controller.state.novel!;
+      controller.setNovelForTesting(
+        Novel(book.slug, book.data, [
+          for (final chapter in book.chapters)
+            Chapter(chapter.data, [Branch(1), Branch(2)]),
+        ]),
+      );
       controller.setBranch(null);
       controller.setVolumeBranch('1', '2');
       controller.setChapterBranch('2/1', '2');
       controller.toggleVolumeExpanded('1');
       controller.toggle(
-        controller.chapters.firstWhere((s) => s.chapter.key == '2/3').chapter,
+        controller.state.chapters
+            .firstWhere((s) => s.chapter.key == '2/3')
+            .chapter,
         false,
       );
       await controller.download();
 
-      expect(controller.error, isNull);
+      expect(controller.state.error, isNull);
       expect(requests, ['1/1', '1/2', '2/1', '10/1']);
       expect(branchRequests, ['2', '2', '2', '1']);
       final zip = ZipDecoder().decodeBytes(storage.files.single.bytes);
@@ -238,24 +246,28 @@ void main() {
     test(
       'global branch keeps fallback chapters in EPUB (split: $split)',
       () async {
-        final book = controller.novel!;
-        controller.novel = Novel(book.slug, book.data, [
-          for (final chapter in book.chapters)
-            Chapter(
-              chapter.data,
-              chapter.key == '2/1' ? [Branch(3)] : [Branch(1), Branch(2)],
-            ),
-        ]);
+        final book = controller.state.novel!;
+        controller.setNovelForTesting(
+          Novel(book.slug, book.data, [
+            for (final chapter in book.chapters)
+              Chapter(
+                chapter.data,
+                chapter.key == '2/1' ? [Branch(3)] : [Branch(1), Branch(2)],
+              ),
+          ]),
+        );
         controller.setBranch(null);
         controller.toggle(
-          controller.chapters.firstWhere((s) => s.chapter.key == '2/3').chapter,
+          controller.state.chapters
+              .firstWhere((s) => s.chapter.key == '2/3')
+              .chapter,
           false,
         );
         controller.setSplitByVolume(split);
         controller.setBranch('2');
         await controller.download();
 
-        expect(controller.error, isNull);
+        expect(controller.state.error, isNull);
         expect(requests, ['1/1', '1/2', '2/1', '10/1']);
         expect(branchRequests, ['2', '2', '3', '2']);
         expect(storage.files, hasLength(split ? 3 : 1));
@@ -273,7 +285,7 @@ void main() {
     controller.selectAll(false);
     await controller.download();
 
-    expect(controller.error, 'Виберіть хоча б одну главу.');
+    expect(controller.state.error, 'Выберите хотя бы одну главу.');
     expect(storage.files, isEmpty);
     expect(requests, isEmpty);
   });
@@ -283,10 +295,10 @@ void main() {
     failedVolume = '2';
     await controller.download();
 
-    expect(controller.error, isNotNull);
-    expect(controller.busy, isFalse);
+    expect(controller.state.error, isNotNull);
+    expect(controller.state.busy, isFalse);
     expect(storage.files.single.name, 'Назва & книга — Том 1.epub');
-    expect(controller.savedBooks.single.name, storage.files.single.name);
+    expect(controller.state.savedBooks.single.name, storage.files.single.name);
     expect(requests, ['1/1', '1/2', '2/1']);
   });
 
@@ -295,27 +307,31 @@ void main() {
     storage.failAt = 1;
     await controller.download();
 
-    expect(controller.error, contains('Storage unavailable'));
-    expect(controller.busy, isFalse);
-    expect(controller.saving, isFalse);
-    expect(controller.savedBooks.single.name, 'Назва & книга — Том 1.epub');
+    expect(controller.state.error, contains('Storage unavailable'));
+    expect(controller.state.busy, isFalse);
+    expect(controller.state.saving, isFalse);
+    expect(
+      controller.state.savedBooks.single.name,
+      'Назва & книга — Том 1.epub',
+    );
     expect(requests, ['1/1', '1/2', '2/1', '2/3']);
   });
 
   test('cancels between volumes and preserves the completed file', () async {
     controller.setSplitByVolume(true);
-    controller.addListener(() {
-      if (controller.busy &&
-          !controller.saving &&
-          controller.savedBooks.isNotEmpty) {
+    controller.stream.listen((state) {
+      if (state.busy && !state.saving && state.savedBooks.isNotEmpty) {
         controller.cancel();
       }
     });
     await controller.download();
 
-    expect(controller.error, isNull);
-    expect(controller.notice, 'Завантаження скасовано. Збережено EPUB: 1.');
-    expect(controller.savedBooks.single.name, 'Назва & книга — Том 1.epub');
+    expect(controller.state.error, isNull);
+    expect(controller.state.notice, 'Загрузка отменена. Сохранено EPUB: 1.');
+    expect(
+      controller.state.savedBooks.single.name,
+      'Назва & книга — Том 1.epub',
+    );
     expect(storage.files, hasLength(1));
     expect(requests, ['1/1', '1/2']);
   });

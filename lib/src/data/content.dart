@@ -4,7 +4,7 @@ import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html;
 import 'package:xml/xml.dart';
 
-import 'models.dart';
+import '../domain/models.dart';
 
 String xmlEscape(String value) => const HtmlEscape(
   HtmlEscapeMode.element,
@@ -77,14 +77,14 @@ class ContentParser {
                     textOf(f['id']) == textOf(id),
               );
           if (file.isEmpty || textOf(file.first['url']).isEmpty) {
-            throw FormatException('Не знайдено посилання на зображення $id.');
+            throw FormatException('Не найдена ссылка на изображение $id.');
           }
           return '<img src="${xmlEscape(textOf(file.first['url']))}" alt=""/>';
         }).join();
       }
       final src = textOf(attrs['src']);
       if (src.isEmpty) {
-        throw const FormatException('Зображення у главі не має посилання.');
+        throw const FormatException('У изображения в главе нет ссылки.');
       }
       return '<img src="${xmlEscape(src)}" alt="${xmlEscape(textOf(attrs['alt']))}"/>';
     }
@@ -141,7 +141,7 @@ class ContentParser {
     for (final img in fragment.querySelectorAll('img')) {
       final url = img.attributes['src'] ?? img.attributes['data-src'];
       if (url == null || url.trim().isEmpty) {
-        throw const FormatException('Зображення у главі не має посилання.');
+        throw const FormatException('У изображения в главе нет ссылки.');
       }
       img.attributes['src'] = 'images/${await image(url)}';
       img.attributes.remove('srcset');

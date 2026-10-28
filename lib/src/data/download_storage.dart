@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
-import 'models.dart';
+import '../domain/models.dart';
 
 class DownloadStorage {
   static const _channel = MethodChannel('app.ranobelib/downloads');
@@ -18,7 +18,7 @@ class DownloadStorage {
         'name': filename,
       });
       if (result == null || result['uri'] == null || result['name'] == null) {
-        throw const FileSystemException('Не вдалося зберегти EPUB.');
+        throw const FileSystemException('Не удалось сохранить EPUB.');
       }
       return SavedBook(result['uri']!, result['name']!);
     } finally {
