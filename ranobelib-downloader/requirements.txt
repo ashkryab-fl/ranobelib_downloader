@@ -1,0 +1,10 @@
+beautifulsoup4
+cryptography
+ebooklib
+keyring
+lxml
+Pillow
+PyQt6
+PyQt6-WebEngine
+requests
+tqdm 
